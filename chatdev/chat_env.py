@@ -59,7 +59,7 @@ class ChatEnv:
         self.incorporated_images: Dict[str, str] = {}
         self.requirements: Documents = Documents()
         self.manuals: Documents = Documents()
-        self.env_dict = {
+        self.chat_env_dict = {
             "directory": "",
             "task_prompt": "",
             "task_description":"",
@@ -70,6 +70,63 @@ class ChatEnv:
             "error_summary": "",
             "test_reports": ""
         }
+
+    @property
+    def env_dict(self):
+        """
+        Get the environment dictionary
+        Returns:
+            dict: the environment dictionary
+        """
+        return self.chat_env_dict
+
+    def __getitem__(self, key):
+        """
+        Get an item from the environment dictionary
+        Args:
+            key: the key to get
+
+        Returns:
+            the value associated with the key
+        """
+        return self.chat_env_dict[key]
+
+    def __setitem__(self, key, value):
+        """
+        Set an item in the environment dictionary
+        Args:
+            key: the key to set
+            value: the value to set
+        """
+        self.chat_env_dict[key] = value
+
+    def get(self, key, default=None):
+        """
+        Get an item from the environment dictionary with a default value
+        Args:
+            key: the key to get
+            default: the default value if the key does not exist
+
+        Returns:
+            the value associated with the key or the default value
+        """
+        return self.chat_env_dict.get(key, default)
+
+    def update(self, d):
+        """
+        Update the environment dictionary with another dictionary
+        Args:
+            d: the dictionary to update with
+        """
+        self.chat_env_dict.update(d)
+
+    def copy(self):
+        """
+        Create a copy of the chat environment
+        Returns:
+            ChatEnv: a copy of the chat environment
+        """
+        return ChatEnv(self.config)
 
     @staticmethod
     def fix_module_not_found_error(test_reports):
@@ -96,7 +153,7 @@ class ChatEnv:
             print("{} Created".format(directory))
         else:
             os.mkdir(self.env_dict['directory'])
-    
+
     def init_memory(self):
         self.memory.id_enabled = True
         self.memory.directory = os.path.join(os.getcwd(),"ecl","memory")

@@ -120,43 +120,42 @@ class ChatChain:
 
     def execute_step(self, phase_item: dict):
         """
-        execute single phase in the chain
+        execute one step in the chain
         Args:
-            phase_item: single phase configuration in the ChatChainConfig.json
+            phase_item: dict, contains the phase name and the phase instance
 
         Returns:
-
+            None
         """
+        assert phase_item["phaseType"] in ["SimplePhase", "ComposedPhase"]
+        phase_instance = phase_item['phase']
+        max_turn_step = phase_item['max_turn_step']
+        need_reflect = check_bool(phase_item['need_reflect'])
 
-        phase = phase_item['phase']
-        phase_type = phase_item['phaseType']
-        # For SimplePhase, just look it up from self.phases and conduct the "Phase.execute" method
-        if phase_type == "SimplePhase":
-            max_turn_step = phase_item['max_turn_step']
-            need_reflect = check_bool(phase_item['need_reflect'])
-            if phase in self.phases:
-                self.chat_env = self.phases[phase].execute(self.chat_env,
-                                                           self.chat_turn_limit_default if max_turn_step <= 0 else max_turn_step,
-                                                           need_reflect)
+        # Convert chat_env to sync if it's async
+        if hasattr(self.chat_env, '__await__'):
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            self.chat_env = loop.run_until_complete(self.chat_env)
+
+        if phase_item["phaseType"] == "SimplePhase":
+            log_visualize(f"**[Execute Detail]**\n\nexecute SimplePhase:[{phase_instance}]")
+            if phase_instance in self.phases:
+                self.chat_env = self.phases[phase_instance].execute(self.chat_env,
+                                                                  self.chat_turn_limit_default if max_turn_step <= 0 else max_turn_step,
+                                                                  need_reflect)
             else:
-                raise RuntimeError(f"Phase '{phase}' is not yet implemented in chatdev.phase")
-        # For ComposedPhase, we create instance here then conduct the "ComposedPhase.execute" method
-        elif phase_type == "ComposedPhase":
-            cycle_num = phase_item['cycleNum']
-            composition = phase_item['Composition']
-            compose_phase_class = getattr(self.compose_phase_module, phase)
-            if not compose_phase_class:
-                raise RuntimeError(f"Phase '{phase}' is not yet implemented in chatdev.compose_phase")
-            compose_phase_instance = compose_phase_class(phase_name=phase,
-                                                         cycle_num=cycle_num,
-                                                         composition=composition,
-                                                         config_phase=self.config_phase,
-                                                         config_role=self.config_role,
-                                                         model_type=self.model_type,
-                                                         log_filepath=self.log_filepath)
-            self.chat_env = compose_phase_instance.execute(self.chat_env)
+                print(f"Phase '{phase_instance}' is not yet implemented. \
+                        Please write its config in phaseConfig.json \
+                        and implement it in chatdev.phase")
         else:
-            raise RuntimeError(f"PhaseType '{phase_type}' is not yet implemented.")
+            compose_phase_instance = phase_instance(self.phases, self.chat_turn_limit_default)
+            log_visualize(f"**[Execute Detail]**\n\nexecute ComposedPhase:[{compose_phase_instance.phase_name}]")
+            self.chat_env = compose_phase_instance.execute(self.chat_env)
 
     def execute_chain(self):
         """
@@ -319,7 +318,7 @@ class ChatChain:
         time.sleep(1)
 
         shutil.move(self.log_filepath,
-                    os.path.join(root + "/WareHouse", "_".join([self.project_name, self.org_name, self.start_time]),
+                    os.path.join(root + "/WareHouse", "_".join([self.project_name, self.org_name, self.start_time]), 
                                  os.path.basename(self.log_filepath)))
 
     # @staticmethod

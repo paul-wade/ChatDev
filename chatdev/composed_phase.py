@@ -75,7 +75,7 @@ class ComposedPhase(ABC):
         update self.phase_env (if needed) using chat_env, then the chatting will use self.phase_env to follow the context and fill placeholders in phase prompt
         must be implemented in customized phase
         the usual format is just like:
-        ```
+        ```python
             self.phase_env.update({key:chat_env[key]})
         ```
         Args:
@@ -92,7 +92,7 @@ class ComposedPhase(ABC):
         update chan_env based on the results of self.execute, which is self.seminar_conclusion
         must be implemented in customized phase
         the usual format is just like:
-        ```
+        ```python
             chat_env.xxx = some_func_for_postprocess(self.seminar_conclusion)
         ```
         Args:
@@ -118,47 +118,33 @@ class ComposedPhase(ABC):
 
     def execute(self, chat_env) -> ChatEnv:
         """
-        similar to Phase.execute, but add control for breaking the loop
-        1. receive information from environment(ComposedPhase): update the phase environment from global environment
-        2. for each SimplePhase in ComposedPhase
-            a) receive information from environment(SimplePhase)
-            b) check loop break
-            c) execute the chatting
-            d) change the environment(SimplePhase)
-            e) check loop break
-        3. change the environment(ComposedPhase): update the global environment using the conclusion
-
+        execute the chatting in this phase
+        1. receive information from environment: update the phase environment from global environment
+        2. execute the chatting
+        3. change the environment: update the global environment using the conclusion
         Args:
             chat_env: global chat chain environment
 
         Returns:
+            chat_env: updated global chat chain environment using the conclusion from this phase execution
 
         """
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Update phase environment
         self.update_phase_env(chat_env)
-        for cycle_index in range(1, self.cycle_num + 1):
-            for phase_item in self.composition:
-                assert phase_item["phaseType"] == "SimplePhase"  # right now we do not support nested composition
-                phase = phase_item['phase']
-                max_turn_step = phase_item['max_turn_step']
-                need_reflect = check_bool(phase_item['need_reflect'])
-                self.phase_env["cycle_index"] = cycle_index
-                log_visualize(
-                    f"**[Execute Detail]**\n\nexecute SimplePhase:[{phase}] in ComposedPhase:[{self.phase_name}], cycle {cycle_index}")
-                if phase in self.phases:
-                    self.phases[phase].phase_env = self.phase_env
-                    self.phases[phase].update_phase_env(chat_env)
-                    if self.break_cycle(self.phases[phase].phase_env):
-                        return chat_env
-                    chat_env = self.phases[phase].execute(chat_env,
-                                                          self.chat_turn_limit_default if max_turn_step <= 0 else max_turn_step,
-                                                          need_reflect)
-                    if self.break_cycle(self.phases[phase].phase_env):
-                        return chat_env
-                else:
-                    print(f"Phase '{phase}' is not yet implemented. \
-                            Please write its config in phaseConfig.json \
-                            and implement it in chatdev.phase")
-        chat_env = self.update_chat_env(chat_env)
+
+        # Execute the phase
+        chat_env = super().execute(chat_env)
+
+        # Update chat environment
+        self.update_chat_env(chat_env)
+
         return chat_env
 
 

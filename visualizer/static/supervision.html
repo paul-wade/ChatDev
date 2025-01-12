@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ChatDev Supervision</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.css">
+    <style>
+        .phase-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .phase-active {
+            border-color: #28a745;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.3);
+        }
+        .phase-completed {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .phase-failed {
+            border-color: #dc3545;
+            background-color: #fff5f5;
+        }
+        .phase-paused {
+            border-color: #ffc107;
+            background-color: #fff9e6;
+        }
+        .control-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        #phase-graph, #agent-graph {
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        #events-log {
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.9em;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .guidance-panel {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .agent-message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            display: flex;
+            align-items: flex-start;
+        }
+        .agent-avatar {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+            border-radius: 20px;
+        }
+        .message-content {
+            flex: 1;
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .agent-stats {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 5px;
+        }
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 0.8em;
+            color: #666;
+        }
+        #agent-timeline {
+            height: 200px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">ChatDev Supervision</a>
+            <div class="navbar-nav">
+                <a class="nav-link" href="/">Chat</a>
+                <a class="nav-link" href="/chain_visualizer">Chain</a>
+                <a class="nav-link active" href="/supervision">Supervision</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4 mb-5">
+        <div class="row">
+            <!-- Phase Graph -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Phase Transition Graph</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="phase-graph" class="mermaid">
+                            graph TD
+                            DA[DemandAnalysis]
+                            LC[LanguageChoose]
+                            CD[Coding]
+                            CR[CodeReviewComment]
+                            TS[Test]
+                            FX[FixBug]
+                            RL[Release]
+                            DA -->|modality| LC
+                            LC -->|language| CD
+                            CD -->|codes| CR
+                            CR --> TS
+                            TS -->|fail| FX
+                            TS -->|pass| RL
+                            FX --> TS
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent Interaction Graph -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Agent Interaction Graph</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="agent-graph" class="mermaid">
+                            graph LR
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agent Timeline -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Agent Timeline</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="agent-timeline" class="mermaid">
+                            gantt
+                            title Agent Activities
+                            dateFormat X
+                            axisFormat %s
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent Stats -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Agent Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="agent-stats" id="agent-stats">
+                            <!-- Will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Messages -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Recent Agent Messages</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="agent-messages">
+                            <!-- Will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Phase Status -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Current Phase</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="current-phase" class="phase-card">
+                            <h3 class="phase-name">Loading...</h3>
+                            <div class="phase-details">
+                                <p class="status">Status: <span class="badge bg-secondary">Unknown</span></p>
+                                <p class="agents">Agents: None</p>
+                                <p class="last-message">Last Message: None</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Guidance Panel -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Inject Guidance</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="guidance-form">
+                            <div class="mb-3">
+                                <label class="form-label">Guidance Message:</label>
+                                <textarea class="form-control" id="guidance-text" rows="2" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Priority:</label>
+                                <select class="form-select" id="guidance-priority">
+                                    <option value="1">Low</option>
+                                    <option value="2">Medium</option>
+                                    <option value="3">High</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Send Guidance</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Events Log -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Events Log</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="events-log"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-warning" onclick="controlExecution('pause')">Pause</button>
+                        <button class="btn btn-success" onclick="controlExecution('resume')">Resume</button>
+                        <button class="btn btn-danger" onclick="controlExecution('stop')">Stop</button>
+                        <button class="btn btn-info" onclick="controlExecution('skip_phase')">Skip Phase</button>
+                        <button class="btn btn-secondary" onclick="controlExecution('retry_phase')">Retry Phase</button>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <span id="execution-status" class="badge bg-secondary">Status: Unknown</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+
+        // WebSocket connection
+        const ws = new WebSocket('ws://localhost:8001/ws');
+        let currentPhase = null;
+        let agentStats = {};
+        let messageHistory = [];
+        let timelineStart = Date.now();
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            updateUI(data);
+            updateAgentInteractions(data);
+            updateAgentTimeline(data);
+            updateAgentStats(data);
+            updateAgentMessages(data);
+        };
+
+        function updateUI(data) {
+            // Update phase card
+            const phaseCard = document.getElementById('current-phase');
+            phaseCard.className = `phase-card phase-${data.status.toLowerCase()}`;
+            phaseCard.querySelector('.phase-name').textContent = data.current_phase;
+            phaseCard.querySelector('.status .badge').textContent = data.status;
+            phaseCard.querySelector('.agents').textContent = `Agents: ${data.agents.join(', ')}`;
+            phaseCard.querySelector('.last-message').textContent = `Last Message: ${data.last_message || 'None'}`;
+
+            // Update execution status
+            document.getElementById('execution-status').textContent = `Status: ${data.execution_state}`;
+
+            // Update phase graph
+            if (data.current_phase !== currentPhase) {
+                currentPhase = data.current_phase;
+                updatePhaseGraph();
+            }
+
+            // Add to events log
+            addEventLog(data);
+        }
+
+        function updatePhaseGraph() {
+            // Highlight current phase in the graph
+            const graph = document.querySelector('#phase-graph');
+            mermaid.render('phase-graph-svg', graph.textContent).then(({svg}) => {
+                graph.innerHTML = svg;
+                const currentNode = graph.querySelector(`[id*="${currentPhase}"]`);
+                if (currentNode) {
+                    currentNode.classList.add('current-phase');
+                }
+            });
+        }
+
+        function addEventLog(data) {
+            const log = document.getElementById('events-log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toISOString()}] ${data.current_phase}: ${data.status}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        async function controlExecution(action) {
+            try {
+                const response = await fetch(`http://localhost:8001/supervisor/control/${action}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                console.log('Control action result:', result);
+            } catch (error) {
+                console.error('Error sending control action:', error);
+            }
+        }
+
+        document.getElementById('guidance-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const guidance = {
+                phase: currentPhase,
+                guidance: document.getElementById('guidance-text').value,
+                priority: parseInt(document.getElementById('guidance-priority').value)
+            };
+
+            try {
+                const response = await fetch('http://localhost:8001/supervisor/inject', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(guidance)
+                });
+                const result = await response.json();
+                console.log('Guidance sent:', result);
+                document.getElementById('guidance-text').value = '';
+            } catch (error) {
+                console.error('Error sending guidance:', error);
+            }
+        });
+
+        function updateAgentInteractions(data) {
+            if (!data.agents || !data.last_message) return;
+
+            const graph = document.querySelector('#agent-graph');
+            let nodes = new Set();
+            let edges = new Set();
+
+            // Add current agents
+            data.agents.forEach(agent => {
+                nodes.add(`${agent}["${agent}"]`);
+            });
+
+            // Add interaction if there's a message
+            if (data.last_message) {
+                const sender = data.agents[0]; // Assuming first agent is sender
+                const receiver = data.agents[1]; // Assuming second agent is receiver
+                edges.add(`${sender} -->|"${data.last_message.substring(0, 20)}..."| ${receiver}`);
+            }
+
+            // Update graph
+            const graphDefinition = `
+                graph LR
+                ${Array.from(nodes).join('\n')}
+                ${Array.from(edges).join('\n')}
+            `;
+            mermaid.render('agent-graph-svg', graphDefinition).then(({svg}) => {
+                graph.innerHTML = svg;
+            });
+        }
+
+        function updateAgentTimeline(data) {
+            if (!data.agents || !data.last_message) return;
+
+            const timeline = document.querySelector('#agent-timeline');
+            const elapsed = Math.floor((Date.now() - timelineStart) / 1000);
+
+            let tasks = [];
+            data.agents.forEach((agent, index) => {
+                if (data.last_message) {
+                    tasks.push(`section ${agent}\n${agent} Task :${elapsed}, ${elapsed + 2}`);
+                }
+            });
+
+            const timelineDefinition = `
+                gantt
+                title Agent Activities
+                dateFormat X
+                axisFormat %s
+                ${tasks.join('\n')}
+            `;
+            mermaid.render('timeline-svg', timelineDefinition).then(({svg}) => {
+                timeline.innerHTML = svg;
+            });
+        }
+
+        function updateAgentStats(data) {
+            if (!data.agents) return;
+
+            // Update stats for each agent
+            data.agents.forEach(agent => {
+                if (!agentStats[agent]) {
+                    agentStats[agent] = {
+                        messages: 0,
+                        activeTime: 0,
+                        interactions: 0
+                    };
+                }
+
+                if (data.last_message) {
+                    agentStats[agent].messages++;
+                    agentStats[agent].interactions++;
+                }
+            });
+
+            // Update stats display
+            const statsContainer = document.getElementById('agent-stats');
+            statsContainer.innerHTML = Object.entries(agentStats).map(([agent, stats]) => `
+                <div class="stat-item">
+                    <div class="stat-value">${stats.messages}</div>
+                    <div class="stat-label">${agent} Messages</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.interactions}</div>
+                    <div class="stat-label">Interactions</div>
+                </div>
+            `).join('');
+        }
+
+        function updateAgentMessages(data) {
+            if (!data.last_message) return;
+
+            // Add new message to history
+            messageHistory.unshift({
+                agent: data.agents[0],
+                message: data.last_message,
+                timestamp: new Date().toISOString()
+            });
+
+            // Keep only last 10 messages
+            messageHistory = messageHistory.slice(0, 10);
+
+            // Update messages display
+            const messagesContainer = document.getElementById('agent-messages');
+            messagesContainer.innerHTML = messageHistory.map(msg => `
+                <div class="agent-message">
+                    <img src="static/figures/${msg.agent.toLowerCase()}.png" class="agent-avatar" alt="${msg.agent}">
+                    <div class="message-content">
+                        <strong>${msg.agent}</strong>
+                        <small class="text-muted float-end">${new Date(msg.timestamp).toLocaleTimeString()}</small>
+                        <p class="mb-0">${msg.message}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import os
 import re
 from abc import ABC, abstractmethod
+import asyncio
 
 from camel.agents import RolePlaying
 from camel.messages import ChatMessage
@@ -8,6 +9,7 @@ from camel.typing import TaskType, ModelType
 from chatdev.chat_env import ChatEnv
 from chatdev.statistics import get_info
 from chatdev.utils import log_visualize, log_arguments
+from chatdev.supervisor import supervisor, PhaseContext, PhaseStatus, ExecutionControl
 
 
 class Phase(ABC):
@@ -246,7 +248,7 @@ class Phase(ABC):
         update self.phase_env (if needed) using chat_env, then the chatting will use self.phase_env to follow the context and fill placeholders in phase prompt
         must be implemented in customized phase
         the usual format is just like:
-        ```
+        ```python
             self.phase_env.update({key:chat_env[key]})
         ```
         Args:
@@ -263,7 +265,7 @@ class Phase(ABC):
         update chan_env based on the results of self.execute, which is self.seminar_conclusion
         must be implemented in customized phase
         the usual format is just like:
-        ```
+        ```python
             chat_env.xxx = some_func_for_postprocess(self.seminar_conclusion)
         ```
         Args:
@@ -275,37 +277,101 @@ class Phase(ABC):
         """
         pass
 
-    def execute(self, chat_env, chat_turn_limit, need_reflect) -> ChatEnv:
+    def execute(self, chat_env, chat_turn_limit=1, need_reflect=True) -> ChatEnv:
         """
-        execute the chatting in this phase
-        1. receive information from environment: update the phase environment from global environment
-        2. execute the chatting
-        3. change the environment: update the global environment using the conclusion
-        Args:
-            chat_env: global chat chain environment
-            chat_turn_limit: turn limit in each chat
-            need_reflect: flag for reflection
-
-        Returns:
-            chat_env: updated global chat chain environment using the conclusion from this phase execution
-
+        Given the current environment, execute the phase and return the result
         """
-        self.update_phase_env(chat_env)
-        self.seminar_conclusion = \
-            self.chatting(chat_env=chat_env,
-                          task_prompt=chat_env.env_dict['task_prompt'],
-                          need_reflect=need_reflect,
-                          assistant_role_name=self.assistant_role_name,
-                          user_role_name=self.user_role_name,
-                          phase_prompt=self.phase_prompt,
-                          phase_name=self.phase_name,
-                          assistant_role_prompt=self.assistant_role_prompt,
-                          user_role_prompt=self.user_role_prompt,
-                          chat_turn_limit=chat_turn_limit,
-                          placeholders=self.phase_env,
-                          memory=chat_env.memory,
-                          model_type=self.model_type)
-        chat_env = self.update_chat_env(chat_env)
+        # Convert chat_env to sync if it's async
+        if hasattr(chat_env, '__await__'):
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            chat_env = loop.run_until_complete(chat_env)
+
+        # Update supervisor with phase start
+        context = PhaseContext(
+            current_phase=self.phase_name,
+            status=PhaseStatus.RUNNING,
+            agents=[self.assistant_role_name, self.user_role_name],
+            execution_state=ExecutionControl.RESUME,
+            artifacts={}  # Start with empty artifacts
+        )
+        
+        supervisor.update_context_sync(context)
+
+        try:
+            # Check if we should proceed
+            if not supervisor.should_continue_sync():
+                return chat_env
+
+            self.update_phase_env(chat_env)
+
+            # Initialize role players
+            role_playing = RolePlaying(
+                self.assistant_role_name,
+                self.user_role_name,
+                self.assistant_role_prompt,
+                self.user_role_prompt,
+                task_type=TaskType.CODE,
+                model_type=self.model_type
+            )
+
+            # Start the chat
+            chat_history = []
+            init_msg = role_playing.init_chat(self.phase_prompt, chat_env.chat_env_dict)
+
+            for i in range(chat_turn_limit):
+                # Check for control actions
+                if not supervisor.should_continue_sync():
+                    break
+
+                # Check for supervisor guidance
+                guidance = supervisor.get_guidance_sync(timeout=0.1)
+                if guidance:
+                    # Inject guidance into the conversation
+                    init_msg.content += f"\n\nAdditional guidance: {guidance.guidance}"
+                
+                # Continue with normal chat flow
+                chat_history.append(init_msg)
+                if init_msg is not None:
+                    assistant_response = role_playing.step(init_msg)
+                    chat_history.append(assistant_response)
+                    init_msg = None
+
+                # Update supervisor with latest message and artifacts
+                context.last_message = assistant_response.content if assistant_response else None
+                supervisor.update_context_sync(context)
+
+            # Process chat results if we didn't stop
+            if supervisor.should_continue_sync():
+                self.seminar_conclusion = "\n".join([msg.content for msg in chat_history])
+                if need_reflect:
+                    self._reflection(chat_history, chat_env)
+                self.update_chat_env(chat_env)
+
+                # Update artifacts based on phase
+                if self.phase_name == "DemandAnalysis":
+                    context.artifacts["modality"] = chat_env.env_dict.get('modality', '')
+                elif self.phase_name == "LanguageChoose":
+                    context.artifacts["language"] = chat_env.env_dict.get('language', '')
+                elif self.phase_name == "Coding":
+                    context.artifacts["codes"] = chat_env.codes.codebooks if hasattr(chat_env, 'codes') else {}
+
+                # Update supervisor with completion and artifacts
+                context.status = PhaseStatus.COMPLETED
+                supervisor.update_context_sync(context)
+
+        except Exception as e:
+            # Update supervisor with failure
+            context.status = PhaseStatus.FAILED
+            context.last_message = str(e)
+            context.execution_state = ExecutionControl.STOP
+            supervisor.update_context_sync(context)
+            raise e
+
         return chat_env
 
 

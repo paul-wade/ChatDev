@@ -1,0 +1,54 @@
+{
+    "chain": [{
+            "phase": "ProjectAnalysis",
+            "phaseType": "SimplePhase",
+            "max_turn_step": 1,
+            "need_reflect": "True"
+        },
+        {
+            "phase": "TestSuite",
+            "phaseType": "ComposedPhase",
+            "cycleNum": 1,
+            "Composition": [{
+                "phase": "TestDesign",
+                "phaseType": "SimplePhase",
+                "max_turn_step": 1,
+                "need_reflect": "True"
+            },
+            {
+                "phase": "TestImplementation",
+                "phaseType": "SimplePhase",
+                "max_turn_step": 1,
+                "need_reflect": "False"
+            }]
+        },
+        {
+            "phase": "PortfolioStructure",
+            "phaseType": "SimplePhase",
+            "max_turn_step": 1,
+            "need_reflect": "True"
+        },
+        {
+            "phase": "Documentation",
+            "phaseType": "SimplePhase",
+            "max_turn_step": 1,
+            "need_reflect": "False"
+        }
+    ],
+    "recruitments": [
+        "Chief Executive Officer",
+        "Chief Technology Officer", 
+        "Software Test Engineer",
+        "Technical Writer",
+        "Frontend Developer"
+    ],
+    "clear_structure": "False",
+    "gui_design": "True",
+    "git_management": "True",
+    "incremental_develop": "True",
+    "with_memory": "False",
+    "self_improve": "False",
+    "web_spider": "False",
+    "project_root": "C:/src/pauls3dminesweeper",
+    "background_prompt": "This is an enhancement project for an existing Next.js portfolio site featuring a 3D Minesweeper game. The goal is to add comprehensive testing, documentation, and portfolio structure while preserving the existing functionality."
+}

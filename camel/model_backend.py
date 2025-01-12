@@ -56,12 +56,19 @@ class ModelBackend(ABC):
 
 
 class OpenAIModel(ModelBackend):
-    r"""OpenAI API in a unified ModelBackend interface."""
+    """OpenAI model backend."""
 
-    def __init__(self, model_type: ModelType, model_config_dict: Dict) -> None:
+    def __init__(self, model_type: ModelType, model_config: Dict) -> None:
+        """Initialize the OpenAI model backend.
+
+        Args:
+            model_type: The type of model to use.
+            model_config: The configuration for the model.
+        """
         super().__init__()
         self.model_type = model_type
-        self.model_config_dict = model_config_dict
+        self.model_config_dict = model_config
+        self.client = openai.OpenAI(api_key=OPENAI_API_KEY, base_url=BASE_URL)
 
     def run(self, *args, **kwargs):
         string = "\n".join([message["content"] for message in kwargs["messages"]])
@@ -75,18 +82,6 @@ class OpenAIModel(ModelBackend):
             num_prompt_tokens = len(string.split()) * 1.3  # Rough estimate
 
         if openai_new_api:
-            # Experimental, add base_url
-            if BASE_URL:
-                client = openai.OpenAI(
-                    api_key=OPENAI_API_KEY,
-                    base_url=BASE_URL,
-                    timeout=60.0,  # Increase timeout for local models
-                )
-            else:
-                client = openai.OpenAI(
-                    api_key=OPENAI_API_KEY
-                )
-
             num_max_token_map = {
                 "gpt-3.5-turbo": 4096,
                 "gpt-3.5-turbo-16k": 16384,
@@ -104,8 +99,8 @@ class OpenAIModel(ModelBackend):
             num_max_completion_tokens = num_max_token - num_prompt_tokens
             self.model_config_dict['max_tokens'] = num_max_completion_tokens
 
-            response = client.chat.completions.create(*args, **kwargs, model=self.model_type.value,
-                                                      **self.model_config_dict)
+            response = self.client.chat.completions.create(*args, **kwargs, model=self.model_type.value,
+                                                          **self.model_config_dict)
 
             cost = prompt_cost(
                 self.model_type.value,
@@ -157,10 +152,18 @@ class OpenAIModel(ModelBackend):
 
 
 class StubModel(ModelBackend):
-    r"""A dummy model used for unit tests."""
+    """Stub model backend for testing."""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, model_type: ModelType, model_config: Dict) -> None:
+        """Initialize the stub model backend.
+
+        Args:
+            model_type: The type of model to use.
+            model_config: The configuration for the model.
+        """
         super().__init__()
+        self.model_type = model_type
+        self.model_config_dict = model_config
 
     def run(self, *args, **kwargs) -> Dict[str, Any]:
         ARBITRARY_STRING = "Lorem Ipsum"
@@ -176,32 +179,39 @@ class StubModel(ModelBackend):
 
 
 class ModelFactory:
-    r"""Factory of backend models.
+    """A factory class for creating model backends."""
 
-    Raises:
-        ValueError: in case the provided model type is unknown.
-    """
-
-    @classmethod
-    def create(cls, model_type: ModelType, model_config_dict: Dict):
-        r"""Creates a model backend based on the model type.
+    @staticmethod
+    def create(model_type: ModelType, model_config: Dict) -> ModelBackend:
+        """Create a model backend.
 
         Args:
-            model_type (ModelType): The type of the model.
-            model_config_dict (Dict): The configuration dictionary for the model.
+            model_type: The type of model to create.
+            model_config: The configuration for the model.
 
         Returns:
-            ModelBackend: The created model backend.
+            A model backend instance.
 
         Raises:
-            ValueError: in case the provided model type is unknown.
+            ValueError: If the model type is not supported.
         """
-        if model_type == ModelType.STUB:
-            return StubModel()
-        elif model_type in [ModelType.GPT_3_5_TURBO, ModelType.GPT_3_5_TURBO_NEW,
-                          ModelType.GPT_4, ModelType.GPT_4_32k, ModelType.GPT_4_TURBO,
-                          ModelType.GPT_4_TURBO_V, ModelType.GPT_4O, ModelType.GPT_4O_MINI,
-                          ModelType.LM_STUDIO]:  # Add LM Studio to OpenAI-compatible models
-            return OpenAIModel(model_type, model_config_dict)
+        openai_models = {
+            ModelType.GPT_4,
+            ModelType.GPT_4_32K,
+            ModelType.GPT_4_TURBO,
+            ModelType.GPT_4_TURBO_V,
+            ModelType.GPT_4O,
+            ModelType.GPT_4O_MINI,
+            ModelType.GPT_3_5_TURBO,
+            ModelType.GPT_3_5_TURBO_NEW,
+            ModelType.GPT_3_5_TURBO_16K,
+        }
+
+        if model_type in openai_models:
+            return OpenAIModel(model_type, model_config)
+        elif model_type == ModelType.STUB:
+            return StubModel(model_type, model_config)
+        elif model_type == ModelType.LM_STUDIO:
+            return LMStudioModel(model_type, model_config)
         else:
-            raise ValueError("Unknown model")
+            raise ValueError(f"Unknown model type: {model_type}")

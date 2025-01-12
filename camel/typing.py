@@ -14,9 +14,16 @@
 from enum import Enum
 
 
-class TaskType(Enum):
-    AI_SOCIETY = "ai_society"
+class TaskType(str, Enum):
+    """Task type enumeration."""
     CODE = "code"
+    MATH = "math"
+    WRITING = "writing"
+    ANALYSIS = "analysis"
+    CHAT = "chat"
+    DESIGN = "design"
+    TESTING = "testing"
+    AI_SOCIETY = "ai_society"
     MISALIGNMENT = "misalignment"
     TRANSLATION = "translation"
     EVALUATION = "evaluation"
@@ -43,33 +50,24 @@ class RoleType(Enum):
     CHATDEV_CCO = "chief creative officer (CCO)"
 
 
-class ModelType(Enum):
-    GPT_3_5_TURBO = "gpt-3.5-turbo-16k-0613"
-    GPT_3_5_TURBO_NEW = "gpt-3.5-turbo-16k"
+class ModelType(str, Enum):
+    """Model type enumeration."""
     GPT_4 = "gpt-4"
-    GPT_4_32k = "gpt-4-32k"
+    GPT_4_32K = "gpt-4-32k"
     GPT_4_TURBO = "gpt-4-turbo"
-    GPT_4_TURBO_V = "gpt-4-turbo"
-    GPT_4O = "gpt-4o"
-    GPT_4O_MINI = "gpt-4o-mini"
+    GPT_4_TURBO_V = "gpt-4-turbo-vision"
+    GPT_4O = "gpt-4-openai"
+    GPT_4O_MINI = "gpt-4-openai-mini"
+    GPT_3_5_TURBO = "gpt-3.5-turbo"
+    GPT_3_5_TURBO_NEW = "gpt-3.5-turbo-0613"
+    GPT_3_5_TURBO_16K = "gpt-3.5-turbo-16k"
     STUB = "stub"
-    LM_STUDIO = "granite-3.1-8b-instruct:2"
+    LM_STUDIO = "lm-studio"
 
     @property
     def value_for_tiktoken(self):
-        r"""Returns the model value to be used for tiktoken encoding."""
-        if self == ModelType.GPT_4_TURBO:
-            return "gpt-4"
-        elif self == ModelType.GPT_4_TURBO_V:
-            return "gpt-4"
-        elif self == ModelType.GPT_4O:
-            return "gpt-4"
-        elif self == ModelType.GPT_4O_MINI:
-            return "gpt-4"
-        elif self == ModelType.LM_STUDIO:
-            return "gpt-3.5-turbo"
-        else:
-            return self.value
+        """Get the value to use for tiktoken."""
+        return self.value
 
 
 class PhaseType(Enum):

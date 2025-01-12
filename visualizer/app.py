@@ -34,6 +34,11 @@ def replay():
     return send_from_directory("static", "replay.html")
 
 
+@app.route("/supervision")
+def supervision():
+    return send_from_directory("static", "supervision.html")
+
+
 @app.route("/get_messages")
 def get_messages():
     return jsonify(messages)

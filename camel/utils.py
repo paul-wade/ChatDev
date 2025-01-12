@@ -86,7 +86,7 @@ def num_tokens_from_messages(
         ModelType.GPT_3_5_TURBO,
         ModelType.GPT_3_5_TURBO_NEW,
         ModelType.GPT_4,
-        ModelType.GPT_4_32k,
+        ModelType.GPT_4_32K,
         ModelType.GPT_4_TURBO,
         ModelType.GPT_4_TURBO_V,
         ModelType.GPT_4O,
@@ -106,37 +106,42 @@ def num_tokens_from_messages(
             f"for information about openai chat models.")
 
 
-def get_model_token_limit(model: ModelType) -> int:
-    r"""Returns the maximum token limit for a given model.
+def get_model_token_limit(model_type: ModelType) -> int:
+    """Get the token limit for a model type.
 
     Args:
-        model (ModelType): The type of the model.
+        model_type: The model type to get the token limit for.
 
     Returns:
-        int: The maximum token limit for the given model.
+        The token limit for the model type.
+
+    Raises:
+        ValueError: If the model type is unknown.
     """
-    if model == ModelType.GPT_4:
+    if model_type == ModelType.GPT_4:
         return 8192
-    elif model == ModelType.GPT_4_32k:
+    elif model_type == ModelType.GPT_4_32K:
         return 32768
-    elif model == ModelType.GPT_4_TURBO:
-        return 100000
-    elif model == ModelType.GPT_4_TURBO_V:
-        return 100000
-    elif model == ModelType.GPT_4O:
+    elif model_type == ModelType.GPT_4_TURBO:
+        return 128000
+    elif model_type == ModelType.GPT_4_TURBO_V:
+        return 128000
+    elif model_type == ModelType.GPT_4O:
+        return 8192
+    elif model_type == ModelType.GPT_4O_MINI:
+        return 8192
+    elif model_type == ModelType.GPT_3_5_TURBO:
         return 4096
-    elif model == ModelType.GPT_4O_MINI:
+    elif model_type == ModelType.GPT_3_5_TURBO_NEW:
         return 16384
-    elif model == ModelType.GPT_3_5_TURBO:
+    elif model_type == ModelType.GPT_3_5_TURBO_16K:
         return 16384
-    elif model == ModelType.GPT_3_5_TURBO_NEW:
-        return 16384
-    elif model == ModelType.STUB:
+    elif model_type == ModelType.STUB:
         return 4096
-    elif model == ModelType.LM_STUDIO:
+    elif model_type == ModelType.LM_STUDIO:
         return 4096
     else:
-        raise ValueError("Unknown model type")
+        raise ValueError(f"Unknown model type: {model_type}")
 
 
 def openai_api_key_required(func: F) -> F:

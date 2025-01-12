@@ -1,0 +1,32 @@
+{
+    "ProjectAnalysis": {
+        "assistant_role": "Chief Technology Officer",
+        "user_role": "Chief Executive Officer",
+        "phase_prompt": "Analyze the existing project structure and codebase at {project_root}. Focus on: 1) Current architecture and dependencies, 2) Minesweeper game implementation, 3) Areas needing tests, 4) Portfolio enhancement opportunities.",
+        "requirements": ["Project understanding", "Test coverage analysis", "Portfolio structure planning"]
+    },
+    "TestDesign": {
+        "assistant_role": "Software Test Engineer",
+        "user_role": "Chief Technology Officer",
+        "phase_prompt": "Design a comprehensive test strategy for the 3D Minesweeper game using Vitest and @react-three/test-renderer. Consider: 1) Game logic tests, 2) 3D rendering tests, 3) User interaction tests.",
+        "requirements": ["Test plan", "Test cases", "Coverage goals"]
+    },
+    "TestImplementation": {
+        "assistant_role": "Software Test Engineer",
+        "user_role": "Chief Technology Officer",
+        "phase_prompt": "Implement the designed test cases using Vitest. Create test files in the appropriate directories and ensure they follow the existing project structure.",
+        "requirements": ["Working tests", "Good coverage", "Clear test descriptions"]
+    },
+    "PortfolioStructure": {
+        "assistant_role": "Frontend Developer",
+        "user_role": "Chief Executive Officer",
+        "phase_prompt": "Design and implement the portfolio structure around the existing Minesweeper game. Create new pages and components for About, Projects, and Contact sections.",
+        "requirements": ["Clean architecture", "Responsive design", "Good UX"]
+    },
+    "Documentation": {
+        "assistant_role": "Technical Writer",
+        "user_role": "Chief Technology Officer",
+        "phase_prompt": "Create comprehensive documentation for: 1) Minesweeper game mechanics, 2) Technical implementation details, 3) Project structure and setup guide.",
+        "requirements": ["Clear explanations", "Code examples", "Setup instructions"]
+    }
+}

@@ -74,7 +74,6 @@ class ChatAgent(BaseAgent):
 
     Args:
         system_message (SystemMessage): The system message for the chat agent.
-        with_memory(bool): The memory setting of the chat agent.
         model (ModelType, optional): The LLM model to use for generating
             responses. (default :obj:`ModelType.GPT_3_5_TURBO`)
         model_config (Any, optional): Configuration options for the LLM model.
@@ -87,27 +86,22 @@ class ChatAgent(BaseAgent):
     def __init__(
             self,
             system_message: SystemMessage,
-            memory=None,
-            model: Optional[ModelType] = None,
-            model_config: Optional[Any] = None,
+            model: ModelType = ModelType.GPT_3_5_TURBO,
+            model_config: Optional[Dict] = None,
             message_window_size: Optional[int] = None,
     ) -> None:
 
         self.system_message: SystemMessage = system_message
         self.role_name: str = system_message.role_name
         self.role_type: RoleType = system_message.role_type
-        self.model: ModelType = (model if model is not None else ModelType.GPT_3_5_TURBO)
-        self.model_config: ChatGPTConfig = model_config or ChatGPTConfig()
-        self.model_token_limit: int = get_model_token_limit(self.model)
+        self.model: ModelType = model
+        self.model_config: Dict = model_config or {}
+        self.model_token_limit: int = get_model_token_limit(model)
         self.message_window_size: Optional[int] = message_window_size
-        self.model_backend: ModelBackend = ModelFactory.create(self.model, self.model_config.__dict__)
+        self.model_backend: ModelBackend = ModelFactory.create(model, self.model_config)
         self.terminated: bool = False
         self.info: bool = False
         self.init_messages()
-        if memory != None and self.role_name in ["Code Reviewer", "Programmer", "Software Test Engineer"]:
-            self.memory = memory.memory_data.get("All")
-        else:
-            self.memory = None
 
     def reset(self) -> List[MessageType]:
         r"""Resets the :obj:`ChatAgent` to its initial state and returns the
