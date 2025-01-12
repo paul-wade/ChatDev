@@ -90,6 +90,11 @@ args = parser.parse_args()
 #          Init ChatChain
 # ----------------------------------------
 config_path, config_phase_path, config_role_path = get_config(args.config)
+
+# Get model type from environment variable or default to GPT-3.5
+model_name = os.environ.get('CHATDEV_MODEL', ModelType.GPT_3_5_TURBO.value)
+model_type = next((t for t in ModelType if t.value == model_name), ModelType.GPT_3_5_TURBO)
+
 args2type = {'GPT_3_5_TURBO': ModelType.GPT_3_5_TURBO,
              'GPT_4': ModelType.GPT_4,
             #  'GPT_4_32K': ModelType.GPT_4_32k,
@@ -107,7 +112,7 @@ chat_chain = ChatChain(config_path=config_path,
                        task_prompt=args.task,
                        project_name=args.name,
                        org_name=args.org,
-                       model_type=args2type[args.model],
+                       model_type=model_type,
                        code_path=args.path)
 
 # ----------------------------------------

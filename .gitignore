@@ -8,3 +8,13 @@
 .venv/
 env/
 venv/
+
+# Secrets and API Keys
+CompanyConfig/Default/API_KEY
+**/API_KEY
+.env
+*.env
+
+# Local configuration
+CompanyConfig/Default/local_*
+**/local_*

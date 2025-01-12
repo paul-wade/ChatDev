@@ -65,10 +65,14 @@ class OpenAIModel(ModelBackend):
 
     def run(self, *args, **kwargs):
         string = "\n".join([message["content"] for message in kwargs["messages"]])
-        encoding = tiktoken.encoding_for_model(self.model_type.value)
-        num_prompt_tokens = len(encoding.encode(string))
-        gap_between_send_receive = 15 * len(kwargs["messages"])
-        num_prompt_tokens += gap_between_send_receive
+        try:
+            encoding = tiktoken.encoding_for_model(self.model_type.value)
+            num_prompt_tokens = len(encoding.encode(string))
+            gap_between_send_receive = 15 * len(kwargs["messages"])
+            num_prompt_tokens += gap_between_send_receive
+        except KeyError:
+            # For LM Studio and other non-OpenAI models, use a simpler token estimation
+            num_prompt_tokens = len(string.split()) * 1.3  # Rough estimate
 
         if openai_new_api:
             # Experimental, add base_url
@@ -76,6 +80,7 @@ class OpenAIModel(ModelBackend):
                 client = openai.OpenAI(
                     api_key=OPENAI_API_KEY,
                     base_url=BASE_URL,
+                    timeout=60.0,  # Increase timeout for local models
                 )
             else:
                 client = openai.OpenAI(
@@ -91,8 +96,9 @@ class OpenAIModel(ModelBackend):
                 "gpt-4-0613": 8192,
                 "gpt-4-32k": 32768,
                 "gpt-4-turbo": 100000,
-                "gpt-4o": 4096, #100000
-                "gpt-4o-mini": 16384, #100000
+                "gpt-4o": 4096,
+                "gpt-4o-mini": 16384,
+                "granite-3.1-8b-instruct:2": 4096,  # Default context window for LM Studio
             }
             num_max_token = num_max_token_map[self.model_type.value]
             num_max_completion_tokens = num_max_token - num_prompt_tokens
@@ -124,8 +130,9 @@ class OpenAIModel(ModelBackend):
                 "gpt-4-0613": 8192,
                 "gpt-4-32k": 32768,
                 "gpt-4-turbo": 100000,
-                "gpt-4o": 4096, #100000
-                "gpt-4o-mini": 16384, #100000
+                "gpt-4o": 4096,
+                "gpt-4o-mini": 16384,
+                "granite-3.1-8b-instruct:2": 4096,  # Default context window for LM Studio
             }
             num_max_token = num_max_token_map[self.model_type.value]
             num_max_completion_tokens = num_max_token - num_prompt_tokens
@@ -175,30 +182,26 @@ class ModelFactory:
         ValueError: in case the provided model type is unknown.
     """
 
-    @staticmethod
-    def create(model_type: ModelType, model_config_dict: Dict) -> ModelBackend:
-        default_model_type = ModelType.GPT_3_5_TURBO
+    @classmethod
+    def create(cls, model_type: ModelType, model_config_dict: Dict):
+        r"""Creates a model backend based on the model type.
 
-        if model_type in {
-            ModelType.GPT_3_5_TURBO,
-            ModelType.GPT_3_5_TURBO_NEW,
-            ModelType.GPT_4,
-            ModelType.GPT_4_32k,
-            ModelType.GPT_4_TURBO,
-            ModelType.GPT_4_TURBO_V,
-            ModelType.GPT_4O,
-            ModelType.GPT_4O_MINI,
-            None
-        }:
-            model_class = OpenAIModel
-        elif model_type == ModelType.STUB:
-            model_class = StubModel
+        Args:
+            model_type (ModelType): The type of the model.
+            model_config_dict (Dict): The configuration dictionary for the model.
+
+        Returns:
+            ModelBackend: The created model backend.
+
+        Raises:
+            ValueError: in case the provided model type is unknown.
+        """
+        if model_type == ModelType.STUB:
+            return StubModel()
+        elif model_type in [ModelType.GPT_3_5_TURBO, ModelType.GPT_3_5_TURBO_NEW,
+                          ModelType.GPT_4, ModelType.GPT_4_32k, ModelType.GPT_4_TURBO,
+                          ModelType.GPT_4_TURBO_V, ModelType.GPT_4O, ModelType.GPT_4O_MINI,
+                          ModelType.LM_STUDIO]:  # Add LM Studio to OpenAI-compatible models
+            return OpenAIModel(model_type, model_config_dict)
         else:
             raise ValueError("Unknown model")
-
-        if model_type is None:
-            model_type = default_model_type
-
-        # log_visualize("Model Type: {}".format(model_type))
-        inst = model_class(model_type, model_config_dict)
-        return inst

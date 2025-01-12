@@ -52,12 +52,24 @@ class ModelType(Enum):
     GPT_4_TURBO_V = "gpt-4-turbo"
     GPT_4O = "gpt-4o"
     GPT_4O_MINI = "gpt-4o-mini"
-
     STUB = "stub"
+    LM_STUDIO = "granite-3.1-8b-instruct:2"
 
     @property
     def value_for_tiktoken(self):
-        return self.value if self.name != "STUB" else "gpt-3.5-turbo-16k-0613"
+        r"""Returns the model value to be used for tiktoken encoding."""
+        if self == ModelType.GPT_4_TURBO:
+            return "gpt-4"
+        elif self == ModelType.GPT_4_TURBO_V:
+            return "gpt-4"
+        elif self == ModelType.GPT_4O:
+            return "gpt-4"
+        elif self == ModelType.GPT_4O_MINI:
+            return "gpt-4"
+        elif self == ModelType.LM_STUDIO:
+            return "gpt-3.5-turbo"
+        else:
+            return self.value
 
 
 class PhaseType(Enum):
